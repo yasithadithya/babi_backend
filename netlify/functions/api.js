@@ -34,7 +34,6 @@ const connectDB = async () => {
             maxPoolSize: 10,
             serverSelectionTimeoutMS: 10000,
             socketTimeoutMS: 45000,
-            // SSL/TLS options for Netlify serverless
             tls: true,
             tlsAllowInvalidCertificates: false,
             tlsAllowInvalidHostnames: false,
@@ -51,27 +50,10 @@ const connectDB = async () => {
     }
 };
 
-// Import routes (lazy load to avoid errors during module initialization)
-let authRoutes, imageRoutes;
-
-const loadRoutes = () => {
-    if (!authRoutes) authRoutes = require('../../routes/auth');
-    if (!imageRoutes) imageRoutes = require('../../routes/images');
-};
-
-// Router for Netlify Functions
-const router = express.Router();
-
-// Health check endpoint (no DB needed)
-router.get('/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Babi Web API is running on Netlify! 💕' });
-});
-
 // Middleware to ensure DB connection before processing requests
 const ensureDbConnection = async (req, res, next) => {
     try {
         await connectDB();
-        loadRoutes();
         next();
     } catch (error) {
         res.status(500).json({
@@ -82,16 +64,23 @@ const ensureDbConnection = async (req, res, next) => {
     }
 };
 
-// Apply DB middleware to all routes except health check
-router.use('/auth', ensureDbConnection, (req, res, next) => {
-    authRoutes(req, res, next);
+// Import routes
+const authRoutes = require('../../routes/auth');
+const imageRoutes = require('../../routes/images');
+
+// Router for Netlify Functions
+const router = express.Router();
+
+// Health check endpoint (no DB needed)
+router.get('/health', (req, res) => {
+    res.json({ status: 'ok', message: 'Babi Web API is running on Netlify! 💕' });
 });
 
-router.use('/images', ensureDbConnection, (req, res, next) => {
-    imageRoutes(req, res, next);
-});
+// Apply DB middleware and mount routes
+router.use('/auth', ensureDbConnection, authRoutes);
+router.use('/images', ensureDbConnection, imageRoutes);
 
-// Mount router
+// Mount router on both paths
 app.use('/api', router);
 app.use('/.netlify/functions/api', router);
 
@@ -108,7 +97,8 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
     res.status(404).json({
         success: false,
-        message: 'Route not found'
+        message: 'Route not found',
+        path: req.path
     });
 });
 
