@@ -7,29 +7,42 @@ const { auth, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+// Check if running in Netlify serverless environment
+const isNetlify = process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+// Only create uploads directory if NOT in serverless environment
+let uploadsDir;
+if (!isNetlify) {
+    uploadsDir = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+    }
 }
 
-// Multer configuration for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const category = req.body.category || 'general';
-        const categoryDir = path.join(uploadsDir, category);
+// Multer configuration - use memory storage for serverless, disk for local
+let storage;
+if (isNetlify) {
+    // In serverless, use memory storage (file uploads won't persist anyway)
+    storage = multer.memoryStorage();
+} else {
+    // Local development - use disk storage
+    storage = multer.diskStorage({
+        destination: (req, file, cb) => {
+            const category = req.body.category || 'general';
+            const categoryDir = path.join(uploadsDir, category);
 
-        if (!fs.existsSync(categoryDir)) {
-            fs.mkdirSync(categoryDir, { recursive: true });
+            if (!fs.existsSync(categoryDir)) {
+                fs.mkdirSync(categoryDir, { recursive: true });
+            }
+
+            cb(null, categoryDir);
+        },
+        filename: (req, file, cb) => {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            cb(null, uniqueSuffix + path.extname(file.originalname));
         }
-
-        cb(null, categoryDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
+    });
+}
 
 const fileFilter = (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
