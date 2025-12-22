@@ -1,27 +1,14 @@
 [build]
-  # Build command (if you have any build step)
   command = "npm install"
-  # Directory to publish (static files, if any)
   publish = "public"
-  # Functions directory
   functions = "netlify/functions"
 
 [functions]
-  # Set Node.js runtime version
   node_bundler = "esbuild"
-  # Include external modules
-  included_files = ["node_modules/**"]
+  # Let esbuild handle bundling - don't include node_modules manually
 
 # Redirect all API requests to the serverless function
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
   status = 200
-
-[[redirects]]
-  from = "/uploads/*"
-  to = "/.netlify/functions/api/uploads/:splat"
-  status = 200
-
-# Environment variables note: Set these in Netlify dashboard
-# MONGODB_URI, JWT_SECRET, NODE_ENV
