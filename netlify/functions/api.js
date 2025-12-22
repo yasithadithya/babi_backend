@@ -1,21 +1,16 @@
 const express = require('express');
 const serverless = require('serverless-http');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('path');
-const connectDB = require('../../config/db');
+const mongoose = require('mongoose');
 
-// Load environment variables
-dotenv.config();
-
-// Connect to MongoDB
-connectDB();
+// Set environment variable to indicate Netlify
+process.env.NETLIFY = 'true';
 
 const app = express();
 
 // CORS Configuration - Allow all origins for Netlify deployment
 app.use(cors({
-    origin: true, // Allow all origins, or specify your frontend URL
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -25,20 +20,69 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// MongoDB connection caching for serverless
+let cachedDb = null;
+
+const connectDB = async () => {
+    if (cachedDb && mongoose.connection.readyState === 1) {
+        return cachedDb;
+    }
+
+    try {
+        const conn = await mongoose.connect(process.env.MONGODB_URI, {
+            bufferCommands: false,
+            maxPoolSize: 10,
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+        });
+
+        cachedDb = conn;
+        console.log('MongoDB connected');
+        return conn;
+    } catch (error) {
+        console.error('MongoDB connection error:', error.message);
+        throw error;
+    }
+};
+
+// Import routes (lazy load to avoid errors during module initialization)
+let authRoutes, imageRoutes;
+
+const loadRoutes = () => {
+    if (!authRoutes) authRoutes = require('../../routes/auth');
+    if (!imageRoutes) imageRoutes = require('../../routes/images');
+};
+
 // Router for Netlify Functions
 const router = express.Router();
 
-// Import routes
-const authRoutes = require('../../routes/auth');
-const imageRoutes = require('../../routes/images');
-
-// API Routes
-router.use('/auth', authRoutes);
-router.use('/images', imageRoutes);
-
-// Health check endpoint
+// Health check endpoint (no DB needed)
 router.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Babi Web API is running on Netlify! 💕' });
+});
+
+// Middleware to ensure DB connection before processing requests
+const ensureDbConnection = async (req, res, next) => {
+    try {
+        await connectDB();
+        loadRoutes();
+        next();
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Database connection failed',
+            error: error.message
+        });
+    }
+};
+
+// Apply DB middleware to all routes except health check
+router.use('/auth', ensureDbConnection, (req, res, next) => {
+    authRoutes(req, res, next);
+});
+
+router.use('/images', ensureDbConnection, (req, res, next) => {
+    imageRoutes(req, res, next);
 });
 
 // Mount router
