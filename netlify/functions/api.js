@@ -32,8 +32,14 @@ const connectDB = async () => {
         const conn = await mongoose.connect(process.env.MONGODB_URI, {
             bufferCommands: false,
             maxPoolSize: 10,
-            serverSelectionTimeoutMS: 5000,
+            serverSelectionTimeoutMS: 10000,
             socketTimeoutMS: 45000,
+            // SSL/TLS options for Netlify serverless
+            tls: true,
+            tlsAllowInvalidCertificates: false,
+            tlsAllowInvalidHostnames: false,
+            retryWrites: true,
+            w: 'majority'
         });
 
         cachedDb = conn;
