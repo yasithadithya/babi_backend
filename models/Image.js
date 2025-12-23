@@ -13,13 +13,13 @@ const imageSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
-    imageData: {
+    imageUrl: {
         type: String,
-        required: [true, 'Image data is required']
+        required: [true, 'Image URL is required']
     },
-    mimeType: {
+    cloudinaryId: {
         type: String,
-        default: 'image/jpeg'
+        default: null
     },
     category: {
         type: String,

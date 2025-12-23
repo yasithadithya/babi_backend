@@ -68,21 +68,14 @@ const ensureDbConnection = async (req, res, next) => {
 const authRoutes = require('../../routes/auth');
 const imageRoutes = require('../../routes/images');
 
-// Router for Netlify Functions
-const router = express.Router();
-
 // Health check endpoint (no DB needed)
-router.get('/health', (req, res) => {
+app.get('/.netlify/functions/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Babi Web API is running on Netlify! 💕' });
 });
 
-// Apply DB middleware and mount routes
-router.use('/auth', ensureDbConnection, authRoutes);
-router.use('/images', ensureDbConnection, imageRoutes);
-
-// Mount router on both paths
-app.use('/api', router);
-app.use('/.netlify/functions/api', router);
+// Mount routes directly on the Netlify functions path
+app.use('/.netlify/functions/api/auth', ensureDbConnection, authRoutes);
+app.use('/.netlify/functions/api/images', ensureDbConnection, imageRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -98,9 +91,10 @@ app.use((req, res) => {
     res.status(404).json({
         success: false,
         message: 'Route not found',
-        path: req.path
+        path: req.path,
+        originalUrl: req.originalUrl
     });
 });
 
-// Export the serverless handler
+// Export the serverless handler with basePath configuration
 module.exports.handler = serverless(app);
