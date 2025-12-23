@@ -69,13 +69,13 @@ const authRoutes = require('../../routes/auth');
 const imageRoutes = require('../../routes/images');
 
 // Health check endpoint (no DB needed)
-app.get('/.netlify/functions/api/health', (req, res) => {
+app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Babi Web API is running on Netlify! 💕' });
 });
 
-// Mount routes directly on the Netlify functions path
-app.use('/.netlify/functions/api/auth', ensureDbConnection, authRoutes);
-app.use('/.netlify/functions/api/images', ensureDbConnection, imageRoutes);
+// Mount routes - use /api prefix (Netlify redirect preserves original path)
+app.use('/api/auth', ensureDbConnection, authRoutes);
+app.use('/api/images', ensureDbConnection, imageRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
